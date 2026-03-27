@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Chơi 2 người{% endblock %}
+
+{% block content %}
+<div class="play-two-players-container">
+    <h2>Chơi 2 người</h2>
+    <p>Chọn Player X hoặc O để bắt đầu:</p>
+
+    <form method="POST" action="{{ url_for('start_two_players') }}">
+        <label>Chọn Player:</label>
+        <select name="player_choice" class="select-player">
+            <option value="X">Player X</option>
+            <option value="O">Player O</option>
+        </select>
+        <button class="btn" type="submit">Bắt đầu chơi</button>
+    </form>
+</div>
+{% endblock %}

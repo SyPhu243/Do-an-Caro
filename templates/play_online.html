@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% block title %}Caro Online{% endblock %}
+
+{% block content %}
+<div class="board-page">
+    <h2>Bàn Caro Online</h2>
+    <p id="turn-indicator">Player hiện tại: <span id="current-turn"></span></p>
+    <p>Bạn đang là: <span id="player-label"></span></p>
+
+    <p>Link phòng: <span id="room-link"></span> 
+        <button id="copy-btn" class="btn ghost" style="margin-left:5px;">Sao chép</button>
+        <span id="copy-msg" style="color: #2ecc71; margin-left:10px; display:none;">Đã sao chép!</span>
+    </p>
+
+    <div class="board-wrap">
+        <div class="board" id="board">
+            {% for i in range(15*15) %}
+            <div class="cell" data-index="{{ i }}"></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div style="margin-top:20px;">
+        <button id="reset-btn" class="btn">Chơi lại</button>
+        <button id="exit-btn" class="btn ghost" style="margin-left:10px;">Thoát</button>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+const sessionUsername = "{{ username }}";
+
+document.addEventListener('DOMContentLoaded', () => {
+    let urlParams = new URLSearchParams(window.location.search);
+    let room = urlParams.get('room');
+    if(!room){
+        room = Math.random().toString(36).substring(2,8);
+        window.history.replaceState({}, '', `?room=${room}`);
+    }
+    const roomLinkEl = document.getElementById('room-link');
+    roomLinkEl.textContent = window.location.href;
+
+    const copyBtn = document.getElementById('copy-btn');
+    const copyMsg = document.getElementById('copy-msg');
+
+    copyBtn.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            copyMsg.style.display = 'inline';
+            setTimeout(()=>{copyMsg.style.display='none';}, 2000);
+        } catch (err) {
+            prompt("Sao chép link phòng: Ctrl+C, Enter", window.location.href);
+        }
+    });
+
+    // --- GAME BOARD ---
+    const board = document.getElementById('board');
+    const resetBtn = document.getElementById('reset-btn');
+    const exitBtn = document.getElementById('exit-btn');
+    const currentTurnEl = document.getElementById('current-turn');
+    const playerLabel = document.getElementById('player-label');
+
+    let cells = Array.from(document.querySelectorAll('.cell'));
+    let boardState = Array(15).fill(0).map(()=>Array(15).fill(''));
+    let currentPlayer = '';
+    let myPlayer = '';
+    let gameOver = false;
+
+    const socket = io();
+    socket.emit('join_room', {room});
+
+    socket.on('joined', data => {
+        myPlayer = data.player;
+        playerLabel.textContent = myPlayer;
+        currentPlayer = data.turn;
+        currentTurnEl.textContent = currentPlayer;
+        data.board.forEach((val, idx) => {
+            const r = Math.floor(idx/15), c = idx%15;
+            boardState[r][c] = val;
+            cells[idx].textContent = val;
+        });
+    });
+
+    socket.on('update_board', data => {
+        const idx = data.index;
+        const r = Math.floor(idx/15), c = idx%15;
+        boardState[r][c] = data.player;
+        cells[idx].textContent = data.player;
+
+        if(checkWin(r, c, data.player)){
+            gameOver = true;
+            highlightWinningCells(r, c, data.player);
+            document.getElementById('turn-indicator').textContent = `Player ${data.player} chiến thắng!`;
+            let result = data.player === myPlayer ? "Thắng" : "Thua";
+            fetch("/save_match_result", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    mode: "Chơi online",
+                    player: data.player,
+                    result: result
+                })
+            }).then(res => res.json()).then(d => console.log("✅ Lưu kết quả online:", d));
+        } else {
+            currentPlayer = data.turn;
+            currentTurnEl.textContent = currentPlayer;
+        }
+    });
+
+    socket.on('reset_board', () => {
+        boardState = Array(15).fill(0).map(()=>Array(15).fill(''));
+        cells.forEach(c => {
+            c.textContent = '';
+            c.style.backgroundColor = '';
+            c.style.color = '';
+            c.style.fontWeight = '';
+        });
+        gameOver = false;
+        currentPlayer = 'X';
+        currentTurnEl.textContent = currentPlayer;
+    });
+
+    cells.forEach(cell => {
+        cell.addEventListener('click', () => {
+            if(gameOver) return;
+            const idx = parseInt(cell.dataset.index);
+            const r = Math.floor(idx/15), c = idx%15;
+            if(boardState[r][c] === '' && myPlayer === currentPlayer){
+                socket.emit('make_move', {room, index: idx, player: myPlayer});
+            }
+        });
+    });
+
+    resetBtn.addEventListener('click', () => { 
+        socket.emit('reset_board', {room}); 
+        gameOver = false;
+    });
+
+    exitBtn.addEventListener('click', () => {
+        const redirectURL = "{{ url_for('choose_mode', _external=True) }}";
+        if (redirectURL.includes('choose_mode')) {
+             window.location.href = redirectURL;
+        } else {
+             window.location.href = "/choose_mode";
+        }
+    });
+
+    function checkWin(row, col, player){
+        return checkDirection(row,col,player,0,1) ||
+               checkDirection(row,col,player,1,0) ||
+               checkDirection(row,col,player,1,1) ||
+               checkDirection(row,col,player,1,-1);
+    }
+
+    function checkDirection(row, col, player, dr, dc){
+        let count = 1;
+        let r = row+dr, c = col+dc;
+        while(r>=0&&r<15&&c>=0&&c<15&&boardState[r][c]===player){count++; r+=dr; c+=dc;}
+        r = row-dr; c = col-dc;
+        while(r>=0&&r<15&&c>=0&&c<15&&boardState[r][c]===player){count++; r-=dr; c-=dc;}
+        return count>=5;
+    }
+
+    function highlightWinningCells(row, col, player){
+        const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+        for(const [dr,dc] of dirs){
+            let winCells=[[row,col]];
+            let r=row+dr,c=col+dc;
+            while(r>=0&&r<15&&c>=0&&c<15&&boardState[r][c]===player){winCells.push([r,c]); r+=dr; c+=dc;}
+            r=row-dr; c=col-dc;
+            while(r>=0&&r<15&&c>=0&&c<15&&boardState[r][c]===player){winCells.push([r,c]); r-=dr; c-=dc;}
+            if(winCells.length>=5){
+                winCells.forEach(([rr,cc])=>{
+                    const idx=rr*15+cc;
+                    cells[idx].style.backgroundColor = (player==='X') ? '#e74c3c' : '#18b38a';
+                    cells[idx].style.color = '#042018';
+                    cells[idx].style.fontWeight = '700';
+                });
+                return;
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

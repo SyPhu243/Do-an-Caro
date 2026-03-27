@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Trang chủ{% endblock %}
+{% block content %}
+<div class="home">
+    {% if username %}
+        <h1>Chào mừng {{ username }} đến với Game Caro!</h1>
+        <p>Chọn “Bắt đầu chơi” để tham gia ngay.</p>
+        <a href="{{ url_for('choose_mode') }}" class="btn">Bắt đầu chơi</a>
+    {% else %}
+        <h1>Chào mừng đến với Game Caro Online</h1>
+        <p>Hãy đăng nhập hoặc đăng ký để bắt đầu chơi!</p>
+    {% endif %}
+</div>
+{% endblock %}

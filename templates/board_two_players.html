@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block title %}Bàn Caro 2 người{% endblock %}
+
+{% block content %}
+<div class="board-page">
+    <h2>Bàn Caro 2 người</h2>
+    <p id="turn-indicator">Player hiện tại: {{ player }}</p>
+
+    <div class="board-wrap">
+        <div class="board" id="board">
+            {% for i in range(15*15) %}
+            <div class="cell" data-index="{{ i }}"></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div style="margin-top:20px;">
+        <button id="reset-btn" class="btn" style="display:none;">Chơi lại</button>
+        <button id="exit-btn" class="btn ghost" style="display:none;">Thoát</button>
+    </div>
+</div>
+
+<script>
+const board = document.getElementById('board');
+const resetBtn = document.getElementById('reset-btn');
+const exitBtn = document.getElementById('exit-btn');
+
+let currentPlayer = '{{ player }}';
+let cells = Array.from(document.querySelectorAll('.cell'));
+let boardState = Array(15).fill(0).map(() => Array(15).fill(''));
+let gameOver = false;
+
+function updateTurn() {
+    document.getElementById('turn-indicator').textContent = "Player hiện tại: " + currentPlayer;
+}
+
+function saveResult(result) {
+    fetch("/save_match_result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            mode: "2_players",
+            player: currentPlayer,
+            result: result
+        })
+    })
+    .then(res => res.json())
+    .then(data => console.log("✅ Kết quả đã lưu:", data))
+    .catch(err => console.error("❌ Lỗi khi lưu:", err));
+}
+
+cells.forEach(cell => {
+    cell.addEventListener('click', () => {
+        if (gameOver) return;
+
+        const index = parseInt(cell.dataset.index);
+        const row = Math.floor(index / 15);
+        const col = index % 15;
+
+        if (boardState[row][col] === '') {
+            boardState[row][col] = currentPlayer;
+            cell.textContent = currentPlayer;
+
+            if (checkWin(row, col, currentPlayer)) {
+                document.getElementById('turn-indicator').textContent = `Player ${currentPlayer} chiến thắng!`;
+                highlightWinningCells(row, col, currentPlayer);
+                gameOver = true;
+                resetBtn.style.display = 'inline-block';
+                exitBtn.style.display = 'inline-block';
+                saveResult(`Thắng: ${currentPlayer}`);
+                return;
+            }
+
+            if (isBoardFull()) {
+                document.getElementById('turn-indicator').textContent = "Hòa!";
+                gameOver = true;
+                resetBtn.style.display = 'inline-block';
+                exitBtn.style.display = 'inline-block';
+                saveResult("Hòa");
+                
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            updateTurn();
+        }
+    });
+});
+
+function isBoardFull() {
+    for (let r=0; r<15; r++) {
+        for (let c=0; c<15; c++) {
+            if (boardState[r][c] === '') return false;
+        }
+    }
+    return true;
+}
+
+function checkWin(row, col, player) {
+    return (
+        checkDirection(row, col, player, 0, 1) || 
+        checkDirection(row, col, player, 1, 0) || 
+        checkDirection(row, col, player, 1, 1) || 
+        checkDirection(row, col, player, 1, -1)
+    );
+}
+
+function checkDirection(row, col, player, dr, dc) {
+    let count = 1;
+    let r = row + dr;
+    let c = col + dc;
+    while (r>=0 && r<15 && c>=0 && c<15 && boardState[r][c] === player) {
+        count++; r+=dr; c+=dc;
+    }
+    r = row - dr; c = col - dc;
+    while (r>=0 && r<15 && c>=0 && c<15 && boardState[r][c] === player) {
+        count++; r-=dr; c-=dc;
+    }
+    return count>=5;
+}
+
+function highlightWinningCells(row, col, player) {
+    const directions = [[0,1],[1,0],[1,1],[1,-1]];
+    for (const [dr,dc] of directions) {
+        let winCells = [[row,col]];
+        let r=row+dr, c=col+dc;
+        while(r>=0 && r<15 && c>=0 && c<15 && boardState[r][c]===player) {
+            winCells.push([r,c]); r+=dr; c+=dc;
+        }
+        r=row-dr; c=col-dc;
+        while(r>=0 && r<15 && c>=0 && c<15 && boardState[r][c]===player) {
+            winCells.push([r,c]); r-=dr; c-=dc;
+        }
+        if(winCells.length>=5){
+            winCells.forEach(([rr,cc])=>{
+                const idx = rr*15+cc;
+                cells[idx].style.backgroundColor = (player==='X')?'#e74c3c':'#18b38a';
+                cells[idx].style.color='#042018';
+                cells[idx].style.fontWeight='700';
+            });
+            return;
+        }
+    }
+}
+
+// Nút chơi lại
+resetBtn.addEventListener('click', () => location.reload());
+
+// Nút thoát về trang chọn chế độ
+exitBtn.addEventListener('click', () => window.location.href = "{{ url_for('choose_mode') }}");
+
+updateTurn();
+</script>
+{% endblock %}

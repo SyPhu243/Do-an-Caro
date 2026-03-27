@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Chơi với Máy</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #121212;
+        color: white;
+        text-align: center;
+        margin: 0;
+        padding: 0;
+    }
+
+    h2 { margin-top: 20px; }
+
+    #message {
+        font-size: 22px;
+        font-weight: bold;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        height: 30px;
+        transition: color 0.3s ease;
+    }
+
+    #game-board {
+        display: grid;
+        grid-template-columns: repeat(15, 40px);
+        justify-content: center;
+        gap: 2px;
+    }
+
+    .cell {
+        width: 40px;
+        height: 40px;
+        background-color: #2a2a2a;
+        border: 1px solid #444;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 22px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .cell:hover { background-color: #3d3d3d; }
+
+    .x { color: #ff4d4d; }
+    .o { color: #4da6ff; }
+
+    #timer { font-size: 18px; margin-top: 10px; }
+
+    .buttons {
+        margin-top: 0;
+        padding-bottom: 30px;
+    }
+
+    button {
+        background-color: #444;
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        margin: 5px;
+        cursor: pointer;
+        border-radius: 6px;
+        font-size: 15px;
+        transition: 0.25s;
+    }
+
+    .reset-button:hover {
+        background-color: #1a961a;
+        transform: scale(1.05);
+    }
+
+    .exit-button:hover {
+        background-color: #d41c1c;
+        transform: scale(1.07);
+    }
+
+    select {
+        background-color: #2a2a2a;
+        color: white;
+        border: 1px solid #555;
+        padding: 5px 8px;
+        margin-left: 10px;
+        border-radius: 5px;
+    }
+</style>
+</head>
+<body>
+    <h2>🤖 Chơi Caro Với Máy</h2>
+
+    <div id="message"></div> 
+    <label for="difficulty">Chọn độ khó:</label>
+    <select id="difficulty">
+        <option value="easy">Dễ</option>
+        <option value="medium" selected>Trung bình</option>
+        <option value="hard">Khó</option>
+    </select>
+
+    <div id="timer">⏱ Thời gian: 0 giây</div>
+    <div id="game-board"></div>
+
+    <div class="buttons">
+        <button onclick="resetGame()" class="reset-button">Chơi lại</button>
+        <button id="exit-btn" class="exit-button">Thoát</button>
+    </div>
+
+<script>
+const boardSize = 15;
+let board = Array.from({ length: boardSize }, () => Array(boardSize).fill(''));
+let gameOver = false;
+let startTime = Date.now();
+
+const gameBoard = document.getElementById("game-board");
+const message = document.getElementById("message");
+const timer = document.getElementById("timer");
+const difficultySelect = document.getElementById("difficulty");
+
+function createBoard() {
+    gameBoard.innerHTML = '';
+    for (let i = 0; i < boardSize; i++) {
+        for (let j = 0; j < boardSize; j++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            cell.dataset.row = i;
+            cell.dataset.col = j;
+            cell.addEventListener("click", handleClick);
+            gameBoard.appendChild(cell);
+        }
+    }
+}
+createBoard();
+
+setInterval(() => {
+    if (!gameOver) {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        timer.textContent = `⏱ Thời gian: ${elapsed} giây`;
+    }
+}, 1000);
+
+function handleClick(e) {
+    if (gameOver) return;
+    const row = parseInt(e.target.dataset.row);
+    const col = parseInt(e.target.dataset.col);
+    if (board[row][col] !== '') return;
+
+    board[row][col] = 'X';
+    e.target.textContent = 'X';
+    e.target.classList.add('x');
+
+    if (checkWin('X')) {
+        showMessage("🎉 Bạn thắng!", "lime");
+        gameOver = true;
+        saveMatchResult("X", "Thắng");
+        return;
+    }
+
+    setTimeout(() => aiMove(), 400);
+}
+
+function aiMove() {
+    if (gameOver) return;
+
+    let mode = difficultySelect.value;
+    let move = (mode === "easy") ? randomMove() :
+               (mode === "medium") ? findSmartMove(1) :
+               findSmartMove(2);
+
+    const { row, col } = move;
+    board[row][col] = 'O';
+    const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+    cell.textContent = 'O';
+    cell.classList.add('o');
+
+    if (checkWin('O')) {
+        showMessage("🤖 Máy thắng!", "#ff4444");
+        gameOver = true;
+        saveMatchResult("X", "Thua");
+    }
+}
+
+// -- EASY MODE --
+function randomMove() {
+    const empty = [];
+    for (let i = 0; i < boardSize; i++)
+        for (let j = 0; j < boardSize; j++)
+            if (board[i][j] === '') empty.push({ row: i, col: j });
+    return empty[Math.floor(Math.random() * empty.length)];
+}
+
+// SMART AI
+function findSmartMove(depth = 1) {
+    let bestScore = -Infinity;
+    let move = null;
+
+    for (let i = 0; i < boardSize; i++) {
+        for (let j = 0; j < boardSize; j++) {
+            if (board[i][j] === '') {
+                let score = evaluateMove(i, j, 'O') + evaluateMove(i, j, 'X') * 0.9;
+                if (depth > 1) score += evaluateNeighbors(i, j);
+                if (score > bestScore) {
+                    bestScore = score;
+                    move = { row: i, col: j };
+                }
+            }
+        }
+    }
+    return move || randomMove();
+}
+
+function evaluateMove(row, col, player) {
+    const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    let total = 0;
+    for (let [dx,dy] of dirs) {
+        let count = 0, block = 0;
+        for (let k=1;k<5;k++){
+            let x=row+dx*k, y=col+dy*k;
+            if (x<0||y<0||x>=boardSize||y>=boardSize) break;
+            if (board[x][y]===player) count++;
+            else if (board[x][y]!==''){block++;break;} else break;
+        }
+        for (let k=1;k<5;k++){
+            let x=row-dx*k, y=col-dy*k;
+            if (x<0||y<0||x>=boardSize||y>=boardSize) break;
+            if (board[x][y]===player) count++;
+            else if (board[x][y]!==''){block++;break;} else break;
+        }
+        let score=0;
+        if(count>=4)score=10000;
+        else if(count===3&&block===0)score=5000;
+        else if(count===3&&block===1)score=1000;
+        else if(count===2&&block===0)score=500;
+        else if(count===2&&block===1)score=100;
+        total+=score;
+    }
+    return total;
+}
+
+function evaluateNeighbors(row, col) {
+    let score = 0;
+    for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+            let x = row + i, y = col + j;
+            if (x >= 0 && y >= 0 && x < boardSize && y < boardSize) {
+                if (board[x][y] !== '') score += 50;
+            }
+        }
+    }
+    return score;
+}
+
+// Check Win
+function checkWin(p) {
+    const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    for (let i=0;i<boardSize;i++){
+        for (let j=0;j<boardSize;j++){
+            if(board[i][j]===p){
+                for(let[dx,dy]of dirs){
+                    let c=1;
+                    for(let k=1;k<5;k++){
+                        let x=i+dx*k,y=j+dy*k;
+                        if(x<0||y<0||x>=boardSize||y>=boardSize||board[x][y]!==p) break;
+                        c++;
+                    }
+                    if(c>=5) return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function resetGame() {
+    board = Array.from({ length: boardSize }, () => Array(boardSize).fill(''));
+    gameOver = false;
+    showMessage("", "white");
+    startTime = Date.now();
+    createBoard();
+}
+
+function saveMatchResult(player, result) {
+    fetch("/save_match_result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            mode: "Chơi với máy",
+            player: player,
+            result: result
+        })
+    })
+    .then(res => res.json())
+    .then(data => console.log("✅ Đã lưu kết quả:", data))
+    .catch(err => console.error("❌ Lỗi lưu kết quả:", err));
+}
+
+function showMessage(text, color) {
+    message.textContent = text;
+    message.style.color = color;
+}
+
+document.getElementById("exit-btn").addEventListener("click", () => {
+    const redirectURL = "{{ url_for('choose_mode', _external=True) }}";
+    if (redirectURL.includes("choose_mode")) {
+        window.location.href = redirectURL;
+    } else {
+        window.location.href = "/choose_mode";
+    }
+});
+</script>
+</body>
+</html>

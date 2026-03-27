@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Chọn chế độ chơi{% endblock %}
+{% block content %}
+<div class="choose-mode-container">
+    <h2>Chọn chế độ chơi</h2>
+    <div class="mode-cards">
+        <a href="{{ url_for('play_two_players') }}" class="mode-card">
+            <h3>Chơi 2 người</h3>
+            <p>Chia sẻ bàn chơi, chọn X hoặc O và đối đầu với bạn bè.</p>
+        </a>
+        <a href="{{ url_for('play_vs_computer') }}" class="mode-card">
+            <h3>Chơi với máy</h3>
+            <p>Đối đầu AI, thử thách trí tuệ của bạn.</p>
+        </a>
+        <a href="{{ url_for('play_online') }}" class="mode-card">
+            <h3>Chơi online</h3>
+            <p>Chơi với người khác qua mạng, kết nối và tranh tài.</p>
+        </a>
+        <a href="{{ url_for('history') }}" class="btn">📜 Xem lịch sử trận đấu</a>
+    </div>
+</div>
+{% endblock %}

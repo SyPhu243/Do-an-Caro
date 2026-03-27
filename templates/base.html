@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Trang chủ{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <h2>
+            <a href="{{ url_for('index') }}" style="color: inherit; text-decoration: none;">
+                🎮 Game Caro Online
+            </a>
+        </h2>
+        <nav>
+            {% if session.get('username') %}
+                <span>Xin chào, <b>{{ session['username'] }}</b>!</span>
+                <a href="{{ url_for('auth.logout') }}">Đăng xuất</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}">Đăng nhập</a>
+                <a href="{{ url_for('auth.register') }}">Đăng ký</a>
+            {% endif %}
+        </nav>
+    </header>
+    
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

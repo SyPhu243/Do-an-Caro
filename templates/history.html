@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Lịch sử trận đấu{% endblock %}
+
+{% block content %}
+<div class="history-container">
+    <h2>Lịch sử trận đấu của {{ username }}</h2>
+
+    {% if matches %}
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Chế độ</th>
+                <th>Người chơi</th>
+                <th>Kết quả</th>
+                <th>Thời gian</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for match in matches %}
+            <tr>
+                <td>{{ match.id }}</td>
+                <td>{{ match.mode }}</td>
+                <td>{{ match.player }}</td>
+                <td>
+                    {% if 'Thắng' in match.result %}
+                        <span style="color:green; font-weight:600;">{{ match.result }}</span>
+                    {% elif 'Hòa' in match.result %}
+                        <span style="color:orange; font-weight:600;">{{ match.result }}</span>
+                    {% elif 'Thua' in match.result %}
+                        <span style="color:red; font-weight:600;">{{ match.result }}</span>    
+                    {% else %}
+                        {{ match.result }}
+                    {% endif %}
+                </td>
+                <td>{{ match.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>Chưa có trận đấu nào được lưu.</p>
+    {% endif %}
+
+    <a href="{{ url_for('choose_mode') }}" class="btn">⬅ Quay lại</a>
+</div>
+
+<style>
+.history-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.history-table {
+    margin: 20px auto;
+    border-collapse: collapse;
+    width: 80%;
+    box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+
+.history-table th, .history-table td {
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.history-table th {
+    background-color: #18b38a;
+    color: white;
+}
+</style>
+{% endblock %}
